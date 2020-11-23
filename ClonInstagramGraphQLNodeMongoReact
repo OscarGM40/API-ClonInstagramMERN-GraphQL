@@ -1,0 +1,381 @@
+      Video 01 Configurando GraphQL y NodeJS
+	  
+Vamos a hacer un clon de Instagram.En este capitulo integraremos GraphQL, un lenguaje de Queries para APIs.
+
+Empecemos creando la carpeta instagram-clone y el proyecto con npm init -y para crear el package.json.
+Vamos a usar babel, asi que vamos a su web e instalamos el core, el cli y el preset-env ademas del node, creamos el .babelrc, y pasamos el script start al package.json "nodemon src/index.js --exec babel-node"	
+
+Debemos instalar :
+    "apollo-server": "^2.19.0",
+    "apollo-server-express": "^2.19.0",
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "express-graphql": "^0.11.0",
+    "graphql": "^15.4.0",
+    "graphql-tools": "^7.0.1",
+    "mongoose": "^5.10.14"
+  } 
+  
+El constructor Apolloserver nos va a pedir los typeDefs(type definitions) y los resolvers asi que creamos dos archivos, y creamos algo básico.el index deberá quedar asi:
+
+import express from 'express';
+import {ApolloServer} from 'apollo-server-express';
+import typeDefs from './schemas';
+import resolvers from './resolvers'
+const app = express();
+
+//middlewares
+const server = new ApolloServer({
+    typeDefs:typeDefs,
+    resolvers:resolvers
+});
+
+server.applyMiddleware({app})
+
+app.listen(3000,() => {
+    console.log("Server on port 3000")
+})
+
+Ya podemos visitar http://localhost:3000/graphql y veremos la interfaz gráfica
+
+           CAPITULO 2 INTEGRAR MONGODB
+
+El capitulo pasado configuramos el servidor GraphQL,hoy vamos a integrar la base de datos MongoDB :
+
+
+mongoose.connect('mongodb://localhost/instagram-clone',{
+    useUnifiedTopology: true,
+    useNewUrlParser: true 
+})
+.then(()=> {
+    console.log("Conectado a Mongo: " + mongoose.connection.name);
+
+Fijarse como tenemos acceso al nombre desde mongoose.connection.name sin meter la funcion en una constante.Ahora vamos a crear los esquemas y modelos
+
+Tendremos de seguro una coleccion User, creamos su schema, exportamos su modelo etc y es turno de GraphQL.
+
+       CREANDO EL SCHEMA DE GraphQL
+	   
+Cualquier cosa que requiera modificacion o edicion se usa el type Mutation(las mutaciones):
+
+export default `
+    type User{
+        _id:ID!
+        username:String!
+        password:String!
+    }
+
+    type Query {
+      holaMundo : String
+    }
+    
+    type Mutation{
+     createUser(username:String!,password:String!):User
+    }
+
+`;	 
+El ! significa not null.Como es crear es una mutacion.La logica va en el resolver:
+Tip: el context es un objeto lleno de informacion,debemos pasarlo al metodo apolloServer
+
+   Mutation:{
+        createUser: (parent,args,{models},info) => {
+            return models.User.create({
+                username:args.username,
+                password:args.password
+            })
+        }
+    }
+
+Vamos a la IU y creamos un User:
+
+mutation{
+  createUser(username:"bob",password:"1234"){
+    _id
+    username
+  }
+}	
+
+Vamos a hacer dos querys.Una para el findAll y otra para findOne.en el schema ponemos esto:
+
+  type Query {
+      allUsers : [User]!
+      getUser:(_id:ID!):User!
+    }    
+
+Como es un array lo ponemos entre [] y ! porque no debe ser null 
+Ojo con el getUser:
+   getUser(_id:ID!):User!
+   
+En resolvers vamos creando la logica, podemos apreciar como se crea rapido todo, tan solo ocupa una linea cada consulta:
+Query:{
+	allUsers: (parent,args,{models},info) =>  models.User.find(),
+	getUser:(parent,args,{models},info) =>  models.User.findOne(args)
+    },
+
+
+Esta es la query desde la UI de GraphQL
+{
+  allUsers{
+    _id
+    username
+  }
+}
+
+Si tenemos un metodo con parametros debemos indicarlos.
+{
+  getUser(
+    _id:"5fb01caec73ee01bdce9543c"
+  ){
+    _id
+    username
+  }
+}
+
+tip: siempre hay que decirle que queremos como resultado.
+
+     CAPITULO 3 MODELOS,ESQUEMAS Y RESOLVERS
+	 
+Para poder modelar las colecciones no vamos a usar referencias, sino embeber datos en arrays:
+
+   posts:{
+        type:[],
+        default:[]
+    },
+    following:{
+        type:[],
+        default:[]
+    },
+    followers:{
+        type:[],
+        default:[]
+    }
+Por defecto los ponemos vacios para que no den null.
+Tip: ver el video xd
+
+           CAPITULO 4 FRONT CON REACT	
+		   
+Vamos a conectar el front con GraphQL.Creamos un proyecto react y hacemos limpieza.Empezaremos por el enrutador, asi que creamos una carpeta llamada rutas.
+Demomento creamos algo muy básico.Fijate como usará arrays para renderizar pares de componentes(mas de uno):
+
+import {
+    BrowserRouter as Router,
+    Route,
+    Switch,
+    Link
+    } from 'react-router-dom';
+
+const Toolbar = ()=>[
+<Link to="/">Home</Link>,
+<Link to="/register">Register</Link>
+]
+
+const Home = () => [<Toolbar />,<h1>Home</h1>]
+const Register = () => <h1>Register</h1>
+
+const routes = () => {
+    return (
+    <Router>
+        <Switch>
+           <Route path="/" exact component={Home}/>
+           <Route path="/register" exact component={Register}/>
+        </Switch>
+    </Router>
+    )
+}
+export default routes;
+
+Vamos a integrar GraphQL a React.Para ello usaremos Apollo y basicmente necesitamos crear un Provider
+
+import {ApolloProvider} from 'react-apollo';
+
+<ApolloProvider client={client}>
+....
+</ApolloProvider>
+
+todo lo que esté englobado de un ApolloProvider puede utilizar queries de GraphQL.
+En el proyecto,para que esté a nivel global, de toda la aplicación, lo vamos a hacer en el index.
+
+npm i react-apollo apollo-client apollo-link-http apollo-cache-inmemory
+
+Despues requerimos estos elementos:
+import {ApolloProvider} from 'react-apollo';
+import {ApolloClient} from 'apollo-client';
+import {HttpLink} from 'apollo-link-http';
+import {InMemoryCache} from 'apollo-cache-inmemory';
+
+La Tag ApolloProvider deberá llevar un atributo client con un cliente:
+
+const client = new ApolloClient({
+  link: new HttpLink(uri: 'http://localhost:3000'),
+  cache: new InMemoryCache()
+})
+
+ReactDOM.render(
+  <ApolloProvider client={client}>
+    <Routes />
+</ApolloProvider>, document....
+
+Al hacer esto cualquier ruta nos va a permitir hacer queries de GraphQL.
+el modulo de cahe deja en cache las queries ya echas y proporciona mucha velocidad.
+
+Tmb vamos a importar graphql-tag
+
+             Video 5 Formulario LOGIN
+			 
+Vamos a usar el framework Semantic UI React 	npm i semantic-ui-react
+Adicionalmente se necesita
+npm i semantic-ui-css
+
+Despues importamos el css.La parte reactiva de React es el estado.Usaremos clases cual prehistorics
+Todo lo que exporte por defecto puedo importarlo sin destructurarlo, si no exporto por defecto eso lo tengo que destructurar.
+
+Para poder poner imagenes en React hay que ir al directorio publico, crear un new folder y entrar a ese directorio, es decir, hay que dar la ruta desde public(fijate que ya esta el index.html ahi)
+
+las funciones flecha pueden devolver directo un valor, sino vas a hacer nada más que devolver, o bien se usan {} y return, si hacen varias sentencias. Ejemplo: 
+(x)=>valordevuelto 
+(x)=>{ console.log(x); return valordevuelto; }
+
+           Video 06 Registro de usuarios
+		   
+Vamos a implementar el registro de usuarios,usaremos bcrypt.
+Fijate como trae por destructuracion un campo y despues el resto del objeto sin ese campo:
+
+{password,...args}		   
+
+   Video 07 Validacion de errores en Mongoose y GraphQL
+   
+Vamos a usar mongoose-validator por su perfecta integracion con mongoose,además de poder validar muchisimas cosas(telefonos, tipos de monedas, decimales,longitudes,ips....Ver la API
+Lo primero es agregar la libreria:
+
+npm i mongoose-validator  
+
+Tip: todos los tipos de GraphQL son con mayusculas.Por ejemplo, un tipo Error:
+
+type Error{
+  path:String!
+  message:String!
+}
+En la definicion se abren las llaves sin mas,y no hace falta las comas.
+
+      MAPEAR UN OBJETO CONVIRTIENDOLO EN ARREGLO
+	  
+Podemos usar el método Object.entries(Objeto a iterar).map:
+
+
+    if(errors){
+        Object.entries(errors).map((error) => {
+           const { path, message } = error[1];
+            objErrors.push({path,message});
+        })
+		
+Push recibe o una variable o un objeto de variables.
+
+Mirar el history al home
+
+             Video 08 Autenticar con JWT
+			 
+Autenticar con JWT es un estandar,recordar que cualquiera puede decodificar el token, asi que no debe ir informacion sensible en el payload
+
+El ciclo de creacion y autenticacion es :			 
+
+1-.El Browser envia el username y password al servidor(en el login¿?)
+
+2-.El servidor crea un token si el usuario es correcto, y lo devuelve al browser
+
+3-.El browser guarda en el local storage el token
+
+4-. Cada vez que el usuario quiere acceder a una ruta, el browser envia en el header el token
+
+5-.El servidor evalua el token y permite o no el acceso
+
+
+En este caso que estamos usando GraphQL vamos a enviar el secret por medio del objeto Context. El contexto es un objeto que le podemos enviar a GraphQL lo que queramos
+
+//middlewares
+const server = new ApolloServer({
+    typeDefs:typeDefs,
+    resolvers:resolvers,
+    /*Por medio del objeto Context podemos enviar a Graphql lo que queramos */
+    context:{
+        models,
+        SECRET, <- lo definimos anteriormente
+        user:{
+            _id:1,
+            username:'bob'
+        }
+		
+A continuacion en los types definimos un type para el login:
+type Mutation{
+      login(username:String!,password:String!):Response!
+Devolverá una Response, la añadimos un token que será opcional:
+   type Response{
+      success:Boolean!
+      token:String
+      errors:[Error]
+    }	  
+
+En el resolvers creamos el metodo login:
+
+Mutation:{
+login: async (parent,{email,password},{models:{User},SECRET}) =>  {
+	return auth.login(username,password, User, SECRET);
+},...otras mutation
+
+Fijate como usa doble destructuring para traer al User solo, prueba con los colores de Material UI.Ese metodo auth.login hay que crearlo.
+Con getToken crearemos dos token, veremos el concepto de refreshToken mas adelante: 
+
+const auth = {
+
+    getToken: ({_id},SECRET) => {
+        const token = jwt.sign({user:_id},SECRET,{
+                expiresIn:'5d'
+        })
+        const refreshToken = jwt.sign({user:_id},SECRET,{
+            expiresIn:'10m'
+    })
+        return [token,refreshToken];
+		
+el metodo es facil, loprimero es comprobar si existe el usuario, si si existe debemos despues comparar las apassworss, si ambas validaciones son true es que es el usuario y le debemos proporcionar un token desde el backend:
+
+ login: async (email,password,User,SECRET) => {
+       // console.log("hola mundo",email,password,User,SECRET);
+       const user = await User.findOne({email})   
+
+       if(!user){
+           return {
+               success:false,
+               errors:[{path:'email',message:'Email no existe'}]
+           }
+       }
+       const validPassword = await bcrypt.compare(password,user.password);
+    //    console.log('haspassword', validPassword)
+    if(!validPassword){
+        return {
+            success:false,
+            errors:[{path:'password',message:"Contraseña incorrecta"}]
+        }
+    }
+
+    const [token,refreshToken] = auth.getToken(user,SECRET);
+    console.log(token)
+
+        return {
+            success:true,
+            token,
+            errors:[]
+        }
+    }
+
+Tip: compose ya no está en react-apollo desde la 3.0
+Hay que importar :
+npm install lodash.flowright
+import * as compose from "lodash.flowright";	
+
+Si estamos en typescript no dejará usar * as, simplemente
+importar :
+import flowright from "lodash.flowright";
+y cambiar los metodos(simply rename compose to flowRight.)
+
+      VIDEO 09 VALIDACION DE JWT EN EL BACKEND
+	  
+Vamos a enviar el token en los encabezados y validarlo desde el backend.Esto es el paso 4, recordemos que el 1 era logearse, el 2 es crear el token desde el backend, el 3 es recibirlo en el browsery almcenarlo, ahora ya podemos enviarlo como autenticacion.	  
