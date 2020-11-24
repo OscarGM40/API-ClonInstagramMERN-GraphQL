@@ -12,7 +12,7 @@ import queries from '../utils/queries';
 import Signin from './login/signin';
 import Signup from './login/signup';
 //import LostPassword from './login/lostpassword';
- 
+                            
 
 const styles = {
     grid: {

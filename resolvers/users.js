@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import auth from './../auth';
+import {isAuthenticatedResolver} from './../permissions'
 
 const formatErrors = (error,otherErrors) => {
     const errors = error.errors;
@@ -36,7 +37,11 @@ const formatErrors = (error,otherErrors) => {
 
 export default{
     Query:{
-        allUsers: (parent,args,{models},info) =>  models.User.find(),
+        allUsers: isAuthenticatedResolver.createResolver(
+            (parent,args,{models},info) =>  models.User.find(),
+            ),    
+
+
         getUser:(parent,args,{models},info) =>  models.User.findOne(args)
     },
     Mutation:{

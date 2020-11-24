@@ -376,6 +376,44 @@ importar :
 import flowright from "lodash.flowright";
 y cambiar los metodos(simply rename compose to flowRight.)
 
-      VIDEO 09 VALIDACION DE JWT EN EL BACKEND
+    VIDEO 09 VALIDACION DE JWT EN EL BACKEND
 	  
-Vamos a enviar el token en los encabezados y validarlo desde el backend.Esto es el paso 4, recordemos que el 1 era logearse, el 2 es crear el token desde el backend, el 3 es recibirlo en el browsery almcenarlo, ahora ya podemos enviarlo como autenticacion.	  
+Vamos a enviar el token en los encabezados y validarlo desde el backend.Esto es el paso 4, recordemos que el 1 era logearse, el 2 es crear el token desde el backend, el 3 es recibirlo en el browser y almacenarlo, ahora ya podemos enviarlo como autenticacion.	 
+Cada solicitud de datos al servidor(en este caso a GraphQl) deberá ser acompañada por el token desde este momento.
+Tip: si el token no es vigente intentará crear uno nuevo y mandarlo al navegador.
+
+Hay un archivo que se llama nodemon.json, podemos pasarle que ignore todo lo que venga de la carpeta del frontend para que no reinicie el server al hacer cambios alli(no va bien).
+
+Tal como tenemos ahora la aplicacion no tenemos protegida ninguna ruta, simplemente tenemos hecho que devuelva el token al registrarse un usuario satisfactoriamente,nada mas.
+
+Si vamos al cliente GRaphi de escritorio podremos guardar El token en el HEADER, hagamos un login exitoso y guardemoslo.
+Tip: siempre que quiera traer algo del .env debo importar dotnev/config, una vez por cada archivo,o llevar todo a un archivo intermediario,etc...
+
+Tip, con la clase ApolloServer se le puede pasar una funcion middleware al Contexto:
+
+    context:(req,res,next) => {
+        console.log("USER ID:", req.user)
+        return{
+        models,
+        SECRET,
+        user:req.user,
+       }
+    }
+});
+
+Asi tenemos vision sobre el objeto global request.
+
+Para reenviar desde el sevidor el token cuando se necesite pasar ese token de refresco se usa el objeto Response:
+
+//INVALID TOKEN-first try to refresh
+	const newToken = await auth.checkToken(token);
+c	onsole.log(newToken);
+	req.user = newToken.user;
+if(newToken.token){
+	res.set("Access-Control-Expose-Headers","x-token")
+	res.set("x-token",newToken.token)
+	
+Setteamos a los headers que se llaman "Access-Control-Expose-Headers" nuestra propiedad x-token y tmb a ella la seteamos el nuevotoken, de esta forma el servidor está continuamnete generando tokens para el usuario.
+
+aun nos falta que no nos devuelva el getAllUsers, pues debe devolverlo sólo ante un usuario autenticado.
+Usaremos el modulo apollo-resolvers.Recordemos que con GraphQL tenemos resolvers,cada una de estas funciones hay que hacer una intercepcion con una funcion, para es este módulo.	  
